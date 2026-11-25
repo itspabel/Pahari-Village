@@ -5,6 +5,7 @@
  */
 
 import * as THREE from "three";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { solveTerrainAtUV, terrainHeightAt } from "./terrain3d.js";
 import {
   getMistWispTexture,
@@ -93,8 +94,8 @@ function buildSculptedRange({
   isDay,
   isMobile = false,
 }) {
-  const segX = isMobile ? 210 : 260;
-  const segY = isMobile ? 40 : 48;
+  const segX = isMobile ? 120 : 156;
+  const segY = isMobile ? 22 : 28;
   const heightSpan = 34;
   const geo = new THREE.PlaneGeometry(width, heightSpan, segX, segY);
   const pos = geo.attributes.position;
@@ -175,7 +176,7 @@ function buildSculptedRange({
 function buildMountainForestBand(points, isDay, tintHex, scaleBase, group, disposables, opts = {}) {
   if (!points.length) return;
   const leafTex = getBroadleafClusterTexture(isDay, opts.texVariant || 0);
-  const crownGeo = new THREE.SphereGeometry(1.0, 9, 7, 0, Math.PI * 2, 0, Math.PI * 0.68);
+  const crownGeo = new THREE.SphereGeometry(1.0, 7, 5, 0, Math.PI * 2, 0, Math.PI * 0.68);
   const crownMat = new THREE.MeshStandardMaterial({
     map: leafTex,
     color: tintHex,
@@ -228,33 +229,37 @@ function buildFlockOfBirds(isDay, group, disposables) {
   const wingTex = getBirdWingTexture(isDay);
   const tailTex = getBirdTailTexture(isDay);
 
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: isDay ? 0xf7f3e8 : 0x26323c,
-    roughness: 0.72,
+  const bodyMat = new THREE.MeshLambertMaterial({
+    vertexColors: true,
   });
-  const headMat = new THREE.MeshStandardMaterial({
-    color: isDay ? 0x273038 : 0x161f26,
-    roughness: 0.68,
-  });
-  const beakMat = new THREE.MeshStandardMaterial({
-    color: isDay ? 0xe59c24 : 0x3b4954,
-    roughness: 0.50,
-  });
-  const wingMat = new THREE.MeshStandardMaterial({
+  const wingMat = new THREE.MeshLambertMaterial({
     map: wingTex,
     alphaTest: 0.22,
-    roughness: 0.76,
     side: THREE.DoubleSide,
   });
-  const tailMat = new THREE.MeshStandardMaterial({
+  const tailMat = new THREE.MeshLambertMaterial({
     map: tailTex,
     alphaTest: 0.22,
-    roughness: 0.78,
     side: THREE.DoubleSide,
   });
 
-  // Sculpted aerodynamic fuselage + neck/head + pointed beak + fanned tail
-  const bodyGeo = new THREE.LatheGeometry(
+  function withVertexColor(srcGeo, hex) {
+    const g = srcGeo.index ? srcGeo.toNonIndexed() : srcGeo.clone();
+    srcGeo.dispose();
+    const count = g.attributes.position.count;
+    const c = new THREE.Color(hex);
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      arr[i * 3] = c.r;
+      arr[i * 3 + 1] = c.g;
+      arr[i * 3 + 2] = c.b;
+    }
+    g.setAttribute("color", new THREE.BufferAttribute(arr, 3));
+    return g;
+  }
+
+  // Sculpted aerodynamic fuselage + neck/head + pointed beak merged into 1 vertex-colored geometry
+  const rawTorsoGeo = new THREE.LatheGeometry(
     [
       new THREE.Vector2(0.004, -0.22),
       new THREE.Vector2(0.022, -0.14),
@@ -269,10 +274,13 @@ function buildFlockOfBirds(isDay, group, disposables) {
     ],
     8
   );
-  bodyGeo.rotateX(Math.PI * 0.5);
+  rawTorsoGeo.rotateX(Math.PI * 0.5);
 
-  // Tapered curved beak emerging from head tip
-  const beakGeo = new THREE.LatheGeometry(
+  const rawCrownGeo = new THREE.SphereGeometry(0.025, 7, 5);
+  rawCrownGeo.scale(0.95, 0.9, 1.15);
+  rawCrownGeo.translate(0, 0.008, 0.31);
+
+  const rawBeakGeo = new THREE.LatheGeometry(
     [
       new THREE.Vector2(0.012, 0.0),
       new THREE.Vector2(0.007, 0.04),
@@ -280,7 +288,16 @@ function buildFlockOfBirds(isDay, group, disposables) {
     ],
     6
   );
-  beakGeo.rotateX(Math.PI * 0.5);
+  rawBeakGeo.rotateX(Math.PI * 0.5);
+  rawBeakGeo.translate(0, -0.004, 0.35);
+
+  const torsoPart = withVertexColor(rawTorsoGeo, isDay ? 0xf7f3e8 : 0x26323c);
+  const crownPart = withVertexColor(rawCrownGeo, isDay ? 0x273038 : 0x161f26);
+  const beakPart = withVertexColor(rawBeakGeo, isDay ? 0xe59c24 : 0x3b4954);
+  const bodyGeo = mergeGeometries([torsoPart, crownPart, beakPart], false);
+  torsoPart.dispose();
+  crownPart.dispose();
+  beakPart.dispose();
 
   const tailGeo = new THREE.PlaneGeometry(0.24, 0.24, 2, 2);
   tailGeo.translate(0, -0.12, 0);
@@ -288,7 +305,7 @@ function buildFlockOfBirds(isDay, group, disposables) {
 
   // Two-segment articulated wing builder (inner secondary wing + outer slotted primary wingtip)
   function makeSegmentWing(side, width, depth, uStart, uEnd, camberH, sweepBack) {
-    const geo = new THREE.PlaneGeometry(width, depth, 5, 3);
+    const geo = new THREE.PlaneGeometry(width, depth, 4, 2);
     const pos = geo.attributes.position;
     const uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) {
@@ -300,7 +317,6 @@ function buildFlockOfBirds(isDay, group, disposables) {
       const localZ = py * chordTaper - t * sweepBack;
       const localY = Math.sin(t * Math.PI) * camberH + (py / depth + 0.5) * 0.015;
       pos.setXYZ(i, worldX, localY, localZ);
-      // Map UV x seamlessly across wing texture (v=1 is leading edge in PlaneGeometry, y=+depth/2)
       uv.setX(i, THREE.MathUtils.lerp(uStart, uEnd, t));
     }
     geo.computeVertexNormals();
@@ -315,8 +331,8 @@ function buildFlockOfBirds(isDay, group, disposables) {
   const rOuterGeo = makeSegmentWing(1, outerLen, 0.21, 0.50, 1.0, 0.022, 0.10);
 
   disposables.push(
-    bodyMat, headMat, beakMat, wingMat, tailMat,
-    bodyGeo, beakGeo, tailGeo,
+    bodyMat, wingMat, tailMat,
+    bodyGeo, tailGeo,
     lInnerGeo, rInnerGeo, lOuterGeo, rOuterGeo
   );
 
@@ -325,18 +341,15 @@ function buildFlockOfBirds(isDay, group, disposables) {
     ? [
         // High V-formation flock soaring smoothly across open azure sky
         { type: "skyline", x0: -26, y: 14.4, z: -17.5, vx: 3.7, span: 36, flapHz: 3.3, scale: 1.85, phase: 0.0 },
-        { type: "skyline", x0: -28.4, y: 14.8, z: -19.0, vx: 3.7, span: 36, flapHz: 3.5, scale: 1.74, phase: 1.1 },
-        { type: "skyline", x0: -28.7, y: 14.1, z: -16.2, vx: 3.7, span: 36, flapHz: 3.4, scale: 1.72, phase: 2.2 },
-        { type: "skyline", x0: -30.8, y: 15.1, z: -20.5, vx: 3.7, span: 36, flapHz: 3.6, scale: 1.64, phase: 3.4 },
-        { type: "skyline", x0: -31.1, y: 13.8, z: -15.0, vx: 3.7, span: 36, flapHz: 3.2, scale: 1.66, phase: 4.5 },
-        // Second sunlit flock gliding right-to-left over upper right peaks
+        { type: "skyline", x0: -28.5, y: 14.8, z: -19.0, vx: 3.7, span: 36, flapHz: 3.5, scale: 1.74, phase: 1.1 },
+        { type: "skyline", x0: -28.8, y: 14.0, z: -16.2, vx: 3.7, span: 36, flapHz: 3.4, scale: 1.72, phase: 2.2 },
+        { type: "skyline", x0: -31.0, y: 15.0, z: -20.4, vx: 3.7, span: 36, flapHz: 3.6, scale: 1.64, phase: 3.4 },
+        // Second sunlit pair gliding right-to-left over upper right peaks
         { type: "skyline", x0: 24, y: 13.1, z: -20.5, vx: -3.2, span: 38, flapHz: 3.2, scale: 1.76, phase: 0.8 },
-        { type: "skyline", x0: 26.4, y: 13.5, z: -21.8, vx: -3.2, span: 38, flapHz: 3.4, scale: 1.66, phase: 2.0 },
-        { type: "skyline", x0: 26.8, y: 12.7, z: -19.2, vx: -3.2, span: 38, flapHz: 3.3, scale: 1.62, phase: 3.1 },
+        { type: "skyline", x0: 26.6, y: 13.5, z: -21.8, vx: -3.2, span: 38, flapHz: 3.4, scale: 1.66, phase: 2.0 },
         // Mid-valley thermal soarers wheeling gracefully above waterfall mist & green ridges
         { type: "circle", cx: -3.5, cy: 11.4, cz: -14, rx: 11.5, rz: 4.8, speed: 0.42, flapHz: 3.6, scale: 1.58, phase: 0.3 },
-        { type: "circle", cx: -1.6, cy: 11.9, cz: -15.5, rx: 11.0, rz: 4.5, speed: 0.42, flapHz: 3.8, scale: 1.50, phase: 1.5 },
-        { type: "circle", cx: -5.2, cy: 10.9, cz: -12.8, rx: 12.0, rz: 5.0, speed: 0.42, flapHz: 3.5, scale: 1.52, phase: 2.8 },
+        { type: "circle", cx: -1.8, cy: 11.9, cz: -15.4, rx: 11.0, rz: 4.5, speed: 0.42, flapHz: 3.8, scale: 1.50, phase: 1.7 },
       ]
     : [
         // Night sky swifts gliding across the moonlit indigo sky & Milky Way
@@ -352,13 +365,6 @@ function buildFlockOfBirds(isDay, group, disposables) {
 
     const bodyRoot = new THREE.Group();
     const torso = new THREE.Mesh(bodyGeo, bodyMat);
-    const crownCap = new THREE.Mesh(new THREE.SphereGeometry(0.025, 7, 6), headMat);
-    crownCap.position.set(0, 0.008, 0.31);
-    crownCap.scale.set(0.95, 0.9, 1.15);
-    disposables.push(crownCap.geometry);
-
-    const beak = new THREE.Mesh(beakGeo, beakMat);
-    beak.position.set(0, -0.004, 0.35);
 
     const tail = new THREE.Mesh(tailGeo, tailMat);
     tail.position.set(0, 0.006, -0.18);
@@ -378,7 +384,7 @@ function buildFlockOfBirds(isDay, group, disposables) {
     rOuter.position.set(innerLen, 0.0, -0.02);
     rInner.add(rOuter);
 
-    bodyRoot.add(torso, crownCap, beak, tail, lInner, rInner);
+    bodyRoot.add(torso, tail, lInner, rInner);
     bird.add(bodyRoot);
     group.add(bird);
     birds.push({ bird, bodyRoot, tail, lInner, lOuter, rInner, rOuter, ...fd });
@@ -498,7 +504,7 @@ function createNightSkyDome(isMobile = false) {
       float fbm(vec2 p) {
         float v = 0.0;
         float a = 0.5;
-        for (int i = 0; i < ${isMobile ? 4 : 5}; i++) {
+        for (int i = 0; i < ${isMobile ? 3 : 4}; i++) {
           v += a * noise2(p);
           p *= 2.04;
           a *= 0.5;
@@ -522,7 +528,6 @@ function createNightSkyDome(isMobile = false) {
         float tw = 0.68 + 0.32 * sin(twinkleTime * (1.4 + rnd2.y * 3.8) + rnd * 91.0);
         float core = exp(-dist * dist * (52.0 - mag * 22.0));
         float halo = smoothstep(0.38, 0.02, dist) * (0.18 + 0.45 * mag);
-        // Delicate 4-point diffraction spike only on the rarest brightest stars
         float spike = 0.0;
         if (mag > 0.82) {
           float sx = exp(-abs(d.y) * 28.0) * exp(-abs(d.x) * 6.5);
@@ -530,7 +535,6 @@ function createNightSkyDome(isMobile = false) {
           spike = (sx + sy) * (mag - 0.82) * 2.2;
         }
 
-        // Realistic stellar spectral colors (blue-white O/B, diamond A, warm gold G/K)
         vec3 sCol = mix(vec3(0.72, 0.86, 1.0), vec3(1.0, 0.96, 0.88), rnd2.y);
         if (rnd2.y > 0.78) sCol = mix(sCol, vec3(1.0, 0.80, 0.58), (rnd2.y - 0.78) * 3.2);
         return sCol * (core + halo + spike) * tw * (0.45 + 0.85 * mag);
@@ -550,33 +554,34 @@ function createNightSkyDome(isMobile = false) {
         // Spherical sky coordinates for distortion-free Milky Way & starfield
         vec2 sph = vec2(atan(dir.x, -dir.z), asin(clamp(dir.y, -0.99, 0.99)));
 
-        // Rich diagonal Milky Way sweeping across upper-center/right sky
+        // Rich diagonal Milky Way sweeping across upper-center/right sky (skip FBM outside band)
         vec2 mwUv = vec2(sph.x * 1.45, (sph.y - 0.018) * 3.9);
         float bandCoord = mwUv.x * 0.76 - mwUv.y * 0.65 + 0.10;
         float horizonFade = smoothstep(0.008, 0.062, elev);
         float coreMask = exp(-bandCoord * bandCoord * 10.5) * horizonFade;
         float haloMask = exp(-bandCoord * bandCoord * 3.2) * horizonFade;
 
-        float dustTex = fbm(mwUv * 5.6 + vec2(1.4, 0.8));
-        float fineDust = fbm(mwUv * 13.5 - vec2(2.3, 1.1));
-        float riftNoise = fbm(vec2(bandCoord * 7.8 + mwUv.y * 2.6, mwUv.x * 5.2));
-        float riftBand = exp(-pow(bandCoord + (riftNoise - 0.5) * 0.15, 2.0) * 62.0);
+        if (haloMask > 0.008) {
+          float dustTex = fbm(mwUv * 5.6 + vec2(1.4, 0.8));
+          float fineDust = fbm(mwUv * 13.5 - vec2(2.3, 1.1));
+          float riftNoise = fbm(vec2(bandCoord * 7.8 + mwUv.y * 2.6, mwUv.x * 5.2));
+          float riftBand = exp(-pow(bandCoord + (riftNoise - 0.5) * 0.15, 2.0) * 62.0);
 
-        vec3 outerCloud = vec3(0.24, 0.36, 0.58) * (0.35 + 0.75 * dustTex);
-        vec3 innerCore = mix(vec3(0.76, 0.68, 0.58), vec3(0.96, 0.80, 0.58), dustTex) * (0.45 + 0.88 * dustTex * fineDust);
-        vec3 nebulaTint = vec3(0.46, 0.30, 0.58) * smoothstep(0.46, 0.76, fineDust) * coreMask;
+          vec3 outerCloud = vec3(0.24, 0.36, 0.58) * (0.35 + 0.75 * dustTex);
+          vec3 innerCore = mix(vec3(0.76, 0.68, 0.58), vec3(0.96, 0.80, 0.58), dustTex) * (0.45 + 0.88 * dustTex * fineDust);
+          vec3 nebulaTint = vec3(0.46, 0.30, 0.58) * smoothstep(0.46, 0.76, fineDust) * coreMask;
 
-        col += outerCloud * haloMask * 0.54;
-        col += innerCore * coreMask * (1.0 - riftBand * 0.80) * 0.78;
-        col += nebulaTint * (1.0 - riftBand * 0.65) * 0.34;
+          col += outerCloud * haloMask * 0.54;
+          col += innerCore * coreMask * (1.0 - riftBand * 0.80) * 0.78;
+          col += nebulaTint * (1.0 - riftBand * 0.65) * 0.34;
+        }
 
-        // 3-tier spherical multi-magnitude pinpoint stars (clipped cleanly above misty horizon)
+        // 2-tier spherical multi-magnitude pinpoint stars (clipped cleanly above misty horizon)
         float starVis = smoothstep(0.012, 0.052, elev);
         if (starVis > 0.001) {
           vec3 stars = vec3(0.0);
-          stars += starLayer(sph, 155.0, 0.962, uTime) * 1.10;
-          stars += starLayer(sph + vec2(1.7, 0.9), 285.0, 0.946 - coreMask * 0.045, uTime * 1.15) * 0.72;
-          stars += starLayer(sph + vec2(3.1, 2.2), 450.0, 0.935 - coreMask * 0.075, uTime * 0.8) * 0.44;
+          stars += starLayer(sph, 160.0, 0.958, uTime) * 1.12;
+          stars += starLayer(sph + vec2(1.7, 0.9), 305.0, 0.938 - coreMask * 0.065, uTime * 1.15) * 0.68;
           col += stars * starVis;
         }
 
@@ -1073,15 +1078,26 @@ function buildDayWaterfall(group, disposables) {
     [-0.95, -0.10, 1.25, 0.65, 0.40, 0.60, cliffMat],
   ];
 
+  const dryMats = [];
+  const wetMats = [];
+  const rockDummy = new THREE.Object3D();
   for (let i = 0; i < cliffBlocks.length; i++) {
     const [ox, oy, oz, sx, sy, sz, mat] = cliffBlocks[i];
-    const rock = new THREE.Mesh(rockGeo, mat);
-    rock.position.set(pool.x + ox, pool.y + oy, pool.z + oz);
-    rock.scale.set(sx, sy, sz);
-    rock.rotation.set(i * 0.4, i * 1.1, (i % 3) * 0.25);
-    rock.castShadow = true;
-    rock.receiveShadow = true;
-    wfGroup.add(rock);
+    rockDummy.position.set(pool.x + ox, pool.y + oy, pool.z + oz);
+    rockDummy.scale.set(sx, sy, sz);
+    rockDummy.rotation.set(i * 0.4, i * 1.1, (i % 3) * 0.25);
+    rockDummy.updateMatrix();
+    if (mat === wetCliffMat) wetMats.push(rockDummy.matrix.clone());
+    else dryMats.push(rockDummy.matrix.clone());
+  }
+  for (const [mats, mat] of [[dryMats, cliffMat], [wetMats, wetCliffMat]]) {
+    if (!mats.length) continue;
+    const inst = new THREE.InstancedMesh(rockGeo, mat, mats.length);
+    for (let j = 0; j < mats.length; j++) inst.setMatrixAt(j, mats[j]);
+    inst.castShadow = true;
+    inst.receiveShadow = true;
+    inst.instanceMatrix.needsUpdate = true;
+    wfGroup.add(inst);
   }
 
   // 2. Animated 2-tier cascading waterfall shader

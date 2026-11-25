@@ -448,8 +448,8 @@ export function createTerrainForMode(mode = "dark", opts = {}) {
   const streamXZ = buildPolylineXZ(isDay ? DAY_STREAM_UVS : NIGHT_STREAM_UVS, mode);
 
   // Dense terrain mesh spanning [-48..48] x [-92..16] — seamless horizon join!
-  const segX = isMobile ? 180 : 220;
-  const segZ = isMobile ? 144 : 176;
+  const segX = isMobile ? 140 : 180;
+  const segZ = isMobile ? 112 : 144;
   const width = 96;
   const depth = 108;
   const geo = new THREE.PlaneGeometry(width, depth, segX, segZ);

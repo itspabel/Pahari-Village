@@ -116,7 +116,7 @@ export function createVillageWorld(canvas) {
     powerPreference: "high-performance",
   });
   renderer.setPixelRatio(
-    softwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
+    softwareGl ? 1 : Math.min(window.devicePixelRatio || 1, isMobile ? 1.15 : 1.25)
   );
   const initW = canvas.clientWidth || 1376;
   const initH = Math.max(1, canvas.clientHeight || 768);
@@ -186,14 +186,14 @@ export function createVillageWorld(canvas) {
 
   const composer = createFusedAgXComposer(renderer, scene, camera, {
     exposure: 1.16,
-    ssaoStrength: softwareGl || isMobile ? 0.0 : 0.26,
+    ssaoStrength: 0.0,
     dofFocusDist: 42.0,
     dofFocusRange: 30.0,
     dofMaxBlurPx: 0.0,
     bloomStrength: 0.24,
     vignette: 0.14,
     grain: 0.006,
-    disableDepthEffects: isMobile,
+    disableDepthEffects: true,
     preservePixelRatio: true,
   });
 
@@ -229,7 +229,7 @@ export function createVillageWorld(canvas) {
       if (composer.agxPass) {
         composer.agxPass.uniforms.uBloomStrength.value = 0.05;
         composer.agxPass.uniforms.uVignette.value = 0.06;
-        composer.agxPass.uniforms.uSsaoStrength.value = softwareGl || isMobile ? 0.0 : 0.28;
+        composer.agxPass.uniforms.uSsaoStrength.value = 0.0;
       }
       updateWorldCohesionUniforms({
         hazeColor: 0xe6e0d0,
@@ -259,7 +259,7 @@ export function createVillageWorld(canvas) {
       if (composer.agxPass) {
         composer.agxPass.uniforms.uBloomStrength.value = 0.26;
         composer.agxPass.uniforms.uVignette.value = 0.14;
-        composer.agxPass.uniforms.uSsaoStrength.value = softwareGl || isMobile ? 0.0 : 0.24;
+        composer.agxPass.uniforms.uSsaoStrength.value = 0.0;
       }
       updateWorldCohesionUniforms({
         hazeColor: 0x2c3c48,
