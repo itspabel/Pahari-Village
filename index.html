@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Pahari Village 3D — Day &amp; Night</title>
+  <meta name="description" content="Realistic 3D Pahari hill-tract village in Day and Night views from a locked scenic viewpoint matching the reference artwork aspect ratio.">
+  <meta property="og:title" content="Pahari Village 3D — Day &amp; Night">
+  <meta property="og:description" content="Realistic 3D Pahari hill-tract village in Day and Night views from a locked scenic viewpoint matching the reference artwork aspect ratio.">
+  <link rel="icon" href="data:,">
+
+  <!-- Sandbox Storage & History Guard -->
+  <script id="sandbox-storage-shim">
+    (function() {
+      const memStore = {};
+      const safeStorage = {
+        getItem: function(k) { return Object.prototype.hasOwnProperty.call(memStore, k) ? memStore[k] : null; },
+        setItem: function(k, v) { memStore[k] = String(v); },
+        removeItem: function(k) { delete memStore[k]; },
+        clear: function() { for (const k in memStore) delete memStore[k]; }
+      };
+      try {
+        const testKey = "__pb_test__";
+        window.localStorage.setItem(testKey, testKey);
+        window.localStorage.removeItem(testKey);
+      } catch (_) {
+        try { Object.defineProperty(window, "localStorage", { value: safeStorage, configurable: true }); } catch (_) {}
+        try { Object.defineProperty(window, "sessionStorage", { value: safeStorage, configurable: true }); } catch (_) {}
+      }
+      try {
+        const origReplace = history.replaceState;
+        const origPush = history.pushState;
+        history.replaceState = function() { try { return origReplace.apply(this, arguments); } catch (_) {} };
+        history.pushState = function() { try { return origPush.apply(this, arguments); } catch (_) {} };
+      } catch (_) {}
+    })();
+  </script>
+
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body class="theme-dark">
+  <main class="stage-container" id="stage-container">
+    <section class="stage-frame" id="stage-frame" aria-label="Pahari Village 3D Scene">
+      <canvas id="stage-canvas" class="stage-canvas" aria-label="Pahari hill-tract village 3D scene"></canvas>
+    </section>
+
+    <!-- Single Minimal Light / Dark (Day / Night) Mode Toggle -->
+    <div class="theme-toggle-wrap">
+      <div class="theme-segmented" role="group" aria-label="Scene time of day">
+        <button
+          type="button"
+          id="btn-theme-light"
+          class="theme-btn"
+          data-theme="light"
+          aria-pressed="false"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+          </svg>
+          <span>Day</span>
+        </button>
+        <button
+          type="button"
+          id="btn-theme-dark"
+          class="theme-btn is-active"
+          data-theme="dark"
+          aria-pressed="true"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z"></path>
+          </svg>
+          <span>Night</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

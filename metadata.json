@@ -1,0 +1,8 @@
+{
+  "name": "Remix Parking Bench Table Top Puzzle",
+  "description": "Race Gemini 4 Hydrogen and Decisions API across 5 solvable 6x6 3D sliding-car puzzles with live visual thinking traces and Lyria 3.5 audio.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
