@@ -239,6 +239,15 @@ export const DAY_LEFT_TRAIL_UVS = [
   [0.335, 0.905],
 ];
 
+export const DAY_STREAM_UVS = [
+  [0.355, 0.480],
+  [0.350, 0.540],
+  [0.335, 0.610],
+  [0.312, 0.690],
+  [0.280, 0.780],
+  [0.245, 0.870],
+];
+
 /** Builds sculpted 3D curved rice-paddy terraces with raised earthen bunds & moonlit water shelves */
 function buildNightRiceTerraces(group, disposables) {
   const bundMat = new THREE.MeshStandardMaterial({
@@ -427,19 +436,20 @@ function applyTerrainMicroDetailShader(mat, isDay) {
   };
 }
 
-export function createTerrainForMode(mode = "dark") {
+export function createTerrainForMode(mode = "dark", opts = {}) {
   const isDay = mode === "light";
+  const isMobile = Boolean(opts.isMobile);
   const group = new THREE.Group();
   const disposables = [];
 
   const mainXZ = buildPolylineXZ(isDay ? DAY_ROAD_UVS : NIGHT_ROAD_UVS, mode);
   const spurXZ = buildPolylineXZ(isDay ? DAY_LEFT_TRAIL_UVS : NIGHT_VALLEY_ROAD_UVS, mode);
   const machangXZ = isDay ? null : buildPolylineXZ(NIGHT_MACHANG_TRAIL_UVS, mode);
-  const streamXZ = isDay ? null : buildPolylineXZ(NIGHT_STREAM_UVS, mode);
+  const streamXZ = buildPolylineXZ(isDay ? DAY_STREAM_UVS : NIGHT_STREAM_UVS, mode);
 
-  // Dense 220 x 176 terrain mesh spanning [-48..48] x [-92..16] — seamless horizon join!
-  const segX = 220;
-  const segZ = 176;
+  // Dense terrain mesh spanning [-48..48] x [-92..16] — seamless horizon join!
+  const segX = isMobile ? 180 : 220;
+  const segZ = isMobile ? 144 : 176;
   const width = 96;
   const depth = 108;
   const geo = new THREE.PlaneGeometry(width, depth, segX, segZ);
@@ -456,7 +466,7 @@ export function createTerrainForMode(mode = "dark") {
   const cRoad = new THREE.Color(isDay ? 0xd9b36f : 0x856f4f);
   const cRoadRut = new THREE.Color(isDay ? 0xb58e52 : 0x625038);
   const cEarth = new THREE.Color(isDay ? 0x997742 : 0x3b3020);
-  const cStreamBed = new THREE.Color(0x1b2d34);
+  const cStreamBed = new THREE.Color(isDay ? 0x335449 : 0x1b2d34);
 
   const gardenCenter = isDay ? solveTerrainAtUV(0.79, 0.625, "light", 0) : null;
 
@@ -483,8 +493,8 @@ export function createTerrainForMode(mode = "dark") {
     let streamMask = 0;
     if (streamXZ) {
       const dStr = distToPolyline(x, z, streamXZ);
-      streamMask = 1 - smoothstep(0.35, 0.95, dStr.dist);
-      y -= streamMask * 0.36;
+      streamMask = 1 - smoothstep(isDay ? 0.48 : 0.35, isDay ? 1.15 : 0.95, dStr.dist);
+      y -= streamMask * (isDay ? 0.32 : 0.36);
     }
 
     // Gentle soil flattening under Day vegetable beds
@@ -559,17 +569,19 @@ export function createTerrainForMode(mode = "dark") {
     buildDayVegetableBeds(group, disposables);
   }
 
-  // Night animated moonlit stream ribbon winding down the valley
+  // Animated valley stream ribbon (Day sunlit turquoise waterfall creek & Night moonlit stream)
   let waterUniforms = null;
-  if (!isDay && streamXZ) {
-    const curvePts = NIGHT_STREAM_UVS.map(([u, v]) => solveTerrainAtUV(u, v, "dark", -0.09));
+  if (streamXZ) {
+    const streamUVs = isDay ? DAY_STREAM_UVS : NIGHT_STREAM_UVS;
+    const curvePts = streamUVs.map(([u, v]) => solveTerrainAtUV(u, v, mode, isDay ? -0.10 : -0.09));
     const curve = new THREE.CatmullRomCurve3(curvePts);
-    const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.44, 8, false);
-    tubeGeo.scale(1, 0.14, 1);
+    const tubeGeo = new THREE.TubeGeometry(curve, 64, isDay ? 0.58 : 0.44, 8, false);
+    tubeGeo.scale(1, 0.15, 1);
 
     const waterMat = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
+        uIsDay: { value: isDay ? 1.0 : 0.0 },
       },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
@@ -580,14 +592,19 @@ export function createTerrainForMode(mode = "dark") {
       `,
       fragmentShader: /* glsl */ `
         uniform float uTime;
+        uniform float uIsDay;
         varying vec2 vUv;
         void main() {
-          float ripple = sin(vUv.x * 52.0 - uTime * 2.5) * 0.5 + 0.5;
-          float sheen = pow(ripple, 2.8) * smoothstep(0.0, 0.5, sin(vUv.y * 3.14159));
-          vec3 baseWater = vec3(0.20, 0.30, 0.35);
-          vec3 moonSpec = vec3(0.70, 0.82, 0.88);
-          vec3 col = mix(baseWater, moonSpec, sheen * 0.68);
-          gl_FragColor = vec4(col, 0.90);
+          float flow = vUv.x * 58.0 - uTime * (uIsDay > 0.5 ? 4.2 : 2.5);
+          float ripple = sin(flow + sin(vUv.y * 12.0) * 1.4) * 0.5 + 0.5;
+          float ripple2 = sin(flow * 1.9 + 2.1) * 0.5 + 0.5;
+          float centerMask = smoothstep(0.0, 0.45, sin(vUv.y * 3.14159));
+          float sheen = pow(ripple * 0.65 + ripple2 * 0.35, 2.4) * centerMask;
+          float foamEdge = smoothstep(0.68, 0.92, ripple * 0.55 + ripple2 * 0.45) * (1.0 - centerMask * 0.45);
+          vec3 baseWater = uIsDay > 0.5 ? vec3(0.16, 0.46, 0.50) : vec3(0.20, 0.30, 0.35);
+          vec3 specCol = uIsDay > 0.5 ? vec3(0.84, 0.96, 0.98) : vec3(0.70, 0.82, 0.88);
+          vec3 col = mix(baseWater, specCol, clamp(sheen * 0.72 + foamEdge * 0.55 * uIsDay, 0.0, 1.0));
+          gl_FragColor = vec4(col, uIsDay > 0.5 ? 0.92 : 0.90);
           #include <colorspace_fragment>
         }
       `,
@@ -598,6 +615,43 @@ export function createTerrainForMode(mode = "dark") {
     group.add(streamMesh);
     disposables.push(tubeGeo, waterMat);
     waterUniforms = waterMat.uniforms;
+
+    // Smooth mossy river boulders framing the Day waterfall creek banks
+    if (isDay) {
+      const rockGeo = new THREE.DodecahedronGeometry(0.42, 1);
+      const rp = rockGeo.attributes.position;
+      for (let i = 0; i < rp.count; i++) {
+        rp.setY(i, rp.getY(i) * 0.62);
+      }
+      rockGeo.computeVertexNormals();
+      const rockMat = new THREE.MeshStandardMaterial({
+        color: 0x5c6760,
+        roughness: 0.86,
+      });
+      const dummy = new THREE.Object3D();
+      const rockMats = [];
+      for (let s = 0; s < 16; s++) {
+        const t = (s + 0.5) / 16;
+        const pt = curve.getPointAt(t);
+        const side = s % 2 === 0 ? -1 : 1;
+        const offX = side * (0.62 + (s % 3) * 0.16);
+        const rx = pt.x + offX;
+        const rz = pt.z + (s % 3 - 1) * 0.25;
+        dummy.position.set(rx, terrainHeightAt(rx, rz, "light") + 0.05, rz);
+        dummy.rotation.set((s % 4) * 0.2, s * 1.3, (s % 3) * 0.15);
+        const sc = 0.65 + (s % 4) * 0.26;
+        dummy.scale.set(sc * 1.25, sc * 0.78, sc);
+        dummy.updateMatrix();
+        rockMats.push(dummy.matrix.clone());
+      }
+      const rocks = new THREE.InstancedMesh(rockGeo, rockMat, rockMats.length);
+      rockMats.forEach((m, idx) => rocks.setMatrixAt(idx, m));
+      rocks.receiveShadow = true;
+      rocks.castShadow = true;
+      rocks.instanceMatrix.needsUpdate = true;
+      group.add(rocks);
+      disposables.push(rockGeo, rockMat);
+    }
   }
 
   return {

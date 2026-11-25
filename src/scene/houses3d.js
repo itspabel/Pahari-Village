@@ -189,6 +189,7 @@ function buildMachangHut({
   hasGlowingWindows = true,
   isOpenShed = false,
   isHero = false,
+  hasPointLight = false,
   smokeCollectors = [],
   laundryTargets = [],
   nightLights = [],
@@ -410,11 +411,11 @@ function buildMachangHut({
       frontWin.position.set(width * 0.24, stiltHeight + wallHeight * 0.58 + 0.05, hl + 0.018);
       hut.add(frontWin);
 
-      if (!isDay) {
-        const pt = new THREE.PointLight(0xff9b3e, 2.4, 8.2, 1.75);
+      if (!isDay && (isHero || hasPointLight)) {
+        const pt = new THREE.PointLight(0xff9b3e, 2.5, 9.6, 1.68);
         pt.position.set(0, stiltHeight + wallHeight * 0.48, hl + 0.58);
         hut.add(pt);
-        nightLights.push({ light: pt, base: 2.4, seed: pos.x * 1.3 + pos.z });
+        nightLights.push({ light: pt, base: 2.5, seed: pos.x * 1.3 + pos.z });
       }
     }
   } else {
@@ -591,8 +592,9 @@ function buildStoneHearthRing(pos, stoneMat, woodMat) {
   return hearth;
 }
 
-export function createArchitectureForMode(mode = "dark") {
+export function createArchitectureForMode(mode = "dark", opts = {}) {
   const isDay = mode === "light";
+  const isMobile = Boolean(opts.isMobile);
   const group = new THREE.Group();
   const smokeOrigins = [];
   const laundryItems = [];
@@ -621,7 +623,7 @@ export function createArchitectureForMode(mode = "dark") {
     const nightHuts = [
       { u: 0.138, v: 0.748, yaw: 0.58, width: 2.55, length: 3.15, stiltHeight: 1.06, wallHeight: 1.48, ridgeHeight: 1.15, hasPorch: true, hasLadder: true, ladderSide: "front", isHero: true },
       { u: 0.872, v: 0.658, yaw: -0.64, width: 2.45, length: 2.95, stiltHeight: 1.08, wallHeight: 1.42, ridgeHeight: 1.12, hasPorch: true, hasLadder: true, ladderSide: "left", hasChimney: true, isHero: true },
-      { u: 0.770, v: 0.512, yaw: -0.52, width: 2.15, length: 2.6, stiltHeight: 0.92, wallHeight: 1.28, ridgeHeight: 0.98, hasPorch: true, hasLadder: false },
+      { u: 0.770, v: 0.512, yaw: -0.52, width: 2.15, length: 2.6, stiltHeight: 0.92, wallHeight: 1.28, ridgeHeight: 0.98, hasPorch: true, hasLadder: false, hasPointLight: true },
       { u: 0.850, v: 0.468, yaw: -0.45, width: 2.4, length: 2.8, stiltHeight: 0.75, wallHeight: 1.35, ridgeHeight: 1.05, hasPorch: false, hasLadder: false },
       { u: 0.848, v: 0.422, yaw: -0.42, width: 1.75, length: 2.0, stiltHeight: 0.55, wallHeight: 1.05, ridgeHeight: 0.85, hasPorch: false, hasLadder: false },
       { u: 0.686, v: 0.474, yaw: -0.35, width: 1.85, length: 2.2, stiltHeight: 0.62, wallHeight: 1.15, ridgeHeight: 0.90, hasPorch: false, hasLadder: false, hasChimney: true },
@@ -655,7 +657,11 @@ export function createArchitectureForMode(mode = "dark") {
       )
     );
 
-    for (const [hu, hv] of [[0.560, 0.604], [0.653, 0.536]]) {
+    const emberGeo = new THREE.PlaneGeometry(0.11, 0.11);
+    const emberCount = isMobile ? 5 : 7;
+    const hearthCoords = [[0.560, 0.604], [0.653, 0.536]];
+    for (let hIdx = 0; hIdx < hearthCoords.length; hIdx++) {
+      const [hu, hv] = hearthCoords[hIdx];
       const hp = solveTerrainAtUV(hu, hv, "dark", 0.02);
       group.add(buildStoneHearthRing(hp, stoneMat, charredWoodMat));
       smokeOrigins.push(hp.clone().add(new THREE.Vector3(0, 0.25, 0)));
@@ -675,14 +681,16 @@ export function createArchitectureForMode(mode = "dark") {
       group.add(glow);
       hearthGlows.push(glow);
 
-      const hLight = new THREE.PointLight(0xff8022, 1.9, 5.2, 2.0);
-      hLight.position.copy(hp).add(new THREE.Vector3(0, 0.42, 0.2));
-      group.add(hLight);
-      nightLights.push({ light: hLight, base: 1.9, seed: hu * 11 });
+      if (hIdx === 0) {
+        const hLight = new THREE.PointLight(0xff8022, 2.2, 7.5, 1.75);
+        hLight.position.copy(hp).add(new THREE.Vector3(0, 0.42, 0.2));
+        group.add(hLight);
+        nightLights.push({ light: hLight, base: 2.2, seed: hu * 11 });
+      }
 
-      for (let e = 0; e < 7; e++) {
+      for (let e = 0; e < emberCount; e++) {
         const sp = new THREE.Mesh(
-          new THREE.PlaneGeometry(0.11, 0.11),
+          emberGeo,
           new THREE.MeshBasicMaterial({
             map: getSoftGlowTexture(),
             color: 0xffb347,
@@ -692,7 +700,7 @@ export function createArchitectureForMode(mode = "dark") {
           })
         );
         group.add(sp);
-        embers.push({ mesh: sp, origin: hp, phase: e / 7, speed: 0.42 + (e % 3) * 0.09, seed: e * 1.6 });
+        embers.push({ mesh: sp, origin: hp, phase: e / emberCount, speed: 0.42 + (e % 3) * 0.09, seed: e * 1.6 });
       }
     }
   } else {
@@ -771,9 +779,10 @@ export function createArchitectureForMode(mode = "dark") {
   }
 
   const mistTex = getMistWispTexture();
+  const smokeGeo = new THREE.PlaneGeometry(1.08, 0.80);
+  const smokeCount = isMobile ? 14 : 18;
   for (const origin of smokeOrigins) {
-    const count = 18;
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < smokeCount; i++) {
       const mat = new THREE.MeshBasicMaterial({
         map: mistTex,
         color: isDay ? 0xf2f5f7 : 0xd2e0ea,
@@ -781,12 +790,12 @@ export function createArchitectureForMode(mode = "dark") {
         depthWrite: false,
         opacity: 0,
       });
-      const sp = new THREE.Mesh(new THREE.PlaneGeometry(1.08, 0.80), mat);
+      const sp = new THREE.Mesh(smokeGeo, mat);
       group.add(sp);
       smokeSprites.push({
         mesh: sp,
         origin,
-        phase: i / count,
+        phase: i / smokeCount,
         speed: 0.14 + (i % 5) * 0.02,
         seed: i * 1.9 + origin.x,
       });

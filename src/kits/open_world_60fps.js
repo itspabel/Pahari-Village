@@ -62,6 +62,10 @@ export function createTwoTierShadowRig(scene, opts = {}) {
   heroSun.shadow.camera.bottom = -heroSpan;
   heroSun.shadow.bias = -0.00025;
   heroSun.shadow.normalBias = 0.015;
+  if (opts.heroShadowAutoUpdate === false) {
+    heroSun.shadow.autoUpdate = false;
+    heroSun.shadow.needsUpdate = true;
+  }
   heroSun.position.copy(sunDirection).multiplyScalar(42);
   scene.add(heroSun);
   scene.add(heroSun.target);
@@ -70,7 +74,7 @@ export function createTwoTierShadowRig(scene, opts = {}) {
   const tel = ensureTelemetry();
   tel.isOpenWorld = true;
   tel.staticShadowAutoUpdate = staticSun.shadow.autoUpdate;
-  tel.heroShadowMapSize = 2048;
+  tel.heroShadowMapSize = heroRes;
 
   return {
     hemiLight,
@@ -79,6 +83,11 @@ export function createTwoTierShadowRig(scene, opts = {}) {
     sunDirection,
     refreshStaticShadows() {
       staticSun.shadow.needsUpdate = true;
+      tel.staticShadowAutoUpdate = staticSun.shadow.autoUpdate;
+    },
+    refreshAllShadows() {
+      staticSun.shadow.needsUpdate = true;
+      heroSun.shadow.needsUpdate = true;
       tel.staticShadowAutoUpdate = staticSun.shadow.autoUpdate;
     },
     updateHeroFocus(heroPos) {

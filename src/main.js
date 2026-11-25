@@ -11,7 +11,6 @@ ensureTelemetry();
 const FIXED_DT = 1 / 60;
 let core = null;
 let lastTime = 0;
-let accumulator = 0;
 
 async function init() {
   const canvas = document.getElementById("stage-canvas");
@@ -33,26 +32,29 @@ async function init() {
   let rafId = null;
   function rafLoop(now) {
     rafId = null;
-    if (!core?.world?.isContextLost?.()) {
-      if (!lastTime) lastTime = now;
-      const frameDt = Math.min(0.1, Math.max(0, (now - lastTime) / 1000));
-      lastTime = now;
-      accumulator += frameDt;
-      let subSteps = 0;
-      while (accumulator >= FIXED_DT && subSteps < 4) {
-        core.advanceFrame(FIXED_DT);
-        accumulator -= FIXED_DT;
-        subSteps++;
-      }
-      if (subSteps === 0) {
-        core.renderOnly();
-      }
-      rafId = requestAnimationFrame(rafLoop);
-    }
+    if (document.hidden || core?.world?.isContextLost?.()) return;
+    if (!lastTime) lastTime = now;
+    const frameDt = Math.min(0.05, Math.max(0.001, (now - lastTime) / 1000));
+    lastTime = now;
+    core.advanceFrame(frameDt);
+    rafId = requestAnimationFrame(rafLoop);
   }
 
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      lastTime = 0;
+    } else if (rafId === null && !core?.world?.isContextLost?.()) {
+      lastTime = 0;
+      rafId = requestAnimationFrame(rafLoop);
+    }
+  });
+
   canvas.addEventListener("webglcontextrestored", () => {
-    if (rafId === null && !core?.world?.isContextLost?.()) {
+    if (rafId === null && !document.hidden && !core?.world?.isContextLost?.()) {
       lastTime = 0;
       rafId = requestAnimationFrame(rafLoop);
     }

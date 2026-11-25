@@ -27,10 +27,23 @@ import { createArchitectureForMode } from "./houses3d.js";
 import { createFoliageForMode } from "./foliage3d.js";
 import { getSoftGlowTexture } from "./textures3d.js";
 
-function createSubtleNightFireflies(group) {
+function detectMobileDevice() {
+  if (typeof navigator === "undefined" || typeof window === "undefined") return false;
+  const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent || ""
+  );
+  const coarseMobile =
+    Boolean(window.matchMedia?.("(pointer: coarse)")?.matches) &&
+    Math.min(window.innerWidth || 9999, window.innerHeight || 9999) <= 920;
+  return uaMobile || coarseMobile;
+}
+
+function createSubtleNightFireflies(group, isMobile = false) {
   const glowTex = getSoftGlowTexture();
   const flies = [];
-  const mat = new THREE.MeshBasicMaterial({
+  const count = isMobile ? 32 : 42;
+  const sharedGeo = new THREE.PlaneGeometry(0.18, 0.18);
+  const baseMat = new THREE.MeshBasicMaterial({
     map: glowTex,
     color: 0xd9f578,
     transparent: true,
@@ -39,8 +52,8 @@ function createSubtleNightFireflies(group) {
     opacity: 0.75,
   });
 
-  for (let i = 0; i < 42; i++) {
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.18, 0.18), mat.clone());
+  for (let i = 0; i < count; i++) {
+    const m = new THREE.Mesh(sharedGeo, baseMat.clone());
     const x = -18 + ((Math.sin(i * 17.3) * 0.5 + 0.5) * 36);
     const z = -12 + ((Math.cos(i * 11.7) * 0.5 + 0.5) * 24);
     const y = 1.4 + ((Math.sin(i * 23.1) * 0.5 + 0.5) * 4.5);
@@ -69,6 +82,11 @@ function createSubtleNightFireflies(group) {
         f.mesh.scale.setScalar(0.55 + pulse * 0.75);
       }
     },
+    dispose() {
+      sharedGeo.dispose();
+      baseMat.dispose();
+      for (const f of flies) f.mesh.material.dispose();
+    },
   };
 }
 
@@ -90,18 +108,23 @@ export function createVillageWorld(canvas) {
     }
   })();
 
+  const isMobile = detectMobileDevice();
+
   const renderer = new THREE.WebGLRenderer({
     canvas,
     antialias: !softwareGl,
     powerPreference: "high-performance",
   });
-  renderer.setPixelRatio(softwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(
+    softwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 1.5)
+  );
   const initW = canvas.clientWidth || 1376;
   const initH = Math.max(1, canvas.clientHeight || 768);
   renderer.setSize(initW, initH, false);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = softwareGl ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = softwareGl || isMobile ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+  renderer.shadowMap.autoUpdate = false;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(state.theme === "light" ? 0xf5efe0 : 0x0b1016);
@@ -130,6 +153,9 @@ export function createVillageWorld(canvas) {
     heroIntensity: 0.90,
     staticSpan: 66,
     heroSpan: 30,
+    staticMapSize: isMobile ? 1536 : 2048,
+    heroMapSize: isMobile ? 1024 : 2048,
+    heroShadowAutoUpdate: false,
   });
   shadowRig.updateHeroFocus(new THREE.Vector3(2.0, 2.5, 2.0));
 
@@ -137,39 +163,53 @@ export function createVillageWorld(canvas) {
   const dayGroup = new THREE.Group();
   scene.add(nightGroup, dayGroup);
 
-  const nightTerrain = createTerrainForMode("dark");
-  const nightMountains = createMountainsAndSky("dark");
-  const nightArch = createArchitectureForMode("dark");
-  const nightFoliage = createFoliageForMode("dark");
-  nightGroup.add(nightTerrain.group, nightMountains.group, nightArch.group, nightFoliage.group);
-  const nightFireflies = createSubtleNightFireflies(nightGroup);
+  const modeCache = {
+    dark: null,
+    light: null,
+  };
 
-  const dayTerrain = createTerrainForMode("light");
-  const dayMountains = createMountainsAndSky("light");
-  const dayArch = createArchitectureForMode("light");
-  const dayFoliage = createFoliageForMode("light");
-  dayGroup.add(dayTerrain.group, dayMountains.group, dayArch.group, dayFoliage.group);
+  function ensureModeBuilt(modeKey) {
+    if (modeCache[modeKey]) return modeCache[modeKey];
+    const modeOpts = { isMobile };
+    const terrain = createTerrainForMode(modeKey, modeOpts);
+    const mountains = createMountainsAndSky(modeKey, modeOpts);
+    const arch = createArchitectureForMode(modeKey, modeOpts);
+    const foliage = createFoliageForMode(modeKey, modeOpts);
+    const targetGroup = modeKey === "light" ? dayGroup : nightGroup;
+    targetGroup.add(terrain.group, mountains.group, arch.group, foliage.group);
+    const fireflies = modeKey === "dark" ? createSubtleNightFireflies(targetGroup, isMobile) : null;
+    modeCache[modeKey] = { terrain, mountains, arch, foliage, fireflies };
+    return modeCache[modeKey];
+  }
+
+  ensureModeBuilt(state.theme === "light" ? "light" : "dark");
 
   const composer = createFusedAgXComposer(renderer, scene, camera, {
     exposure: 1.16,
-    ssaoStrength: softwareGl ? 0.0 : 0.26,
+    ssaoStrength: softwareGl || isMobile ? 0.0 : 0.26,
     dofFocusDist: 42.0,
     dofFocusRange: 30.0,
-    dofMaxBlurPx: softwareGl ? 0.0 : 0.75,
+    dofMaxBlurPx: 0.0,
     bloomStrength: 0.24,
     vignette: 0.14,
     grain: 0.006,
+    disableDepthEffects: isMobile,
+    preservePixelRatio: true,
   });
 
   function applyThemeLighting(theme) {
     const isLight = theme === "light";
+    const activeKey = isLight ? "light" : "dark";
+    const wasMissing = !modeCache[activeKey];
+    ensureModeBuilt(activeKey);
+
     nightGroup.visible = !isLight;
     dayGroup.visible = isLight;
 
     if (isLight) {
-      scene.background.setHex(0xf8f1e1);
-      scene.fog.color.setHex(0xf0e7d4);
-      scene.fog.density = 0.0028;
+      scene.background.setHex(0x88b8e2);
+      scene.fog.color.setHex(0xe8e4d8);
+      scene.fog.density = 0.0021;
       scene.environmentIntensity = 0.36;
 
       if (shadowRig.hemiLight) {
@@ -189,11 +229,11 @@ export function createVillageWorld(canvas) {
       if (composer.agxPass) {
         composer.agxPass.uniforms.uBloomStrength.value = 0.05;
         composer.agxPass.uniforms.uVignette.value = 0.06;
-        composer.agxPass.uniforms.uSsaoStrength.value = softwareGl ? 0.0 : 0.28;
+        composer.agxPass.uniforms.uSsaoStrength.value = softwareGl || isMobile ? 0.0 : 0.28;
       }
       updateWorldCohesionUniforms({
-        hazeColor: 0xeee4cf,
-        hazeDensity: 0.0012,
+        hazeColor: 0xe6e0d0,
+        hazeDensity: 0.0010,
         warmBounceColor: 0xaa9660,
       });
     } else {
@@ -219,7 +259,7 @@ export function createVillageWorld(canvas) {
       if (composer.agxPass) {
         composer.agxPass.uniforms.uBloomStrength.value = 0.26;
         composer.agxPass.uniforms.uVignette.value = 0.14;
-        composer.agxPass.uniforms.uSsaoStrength.value = softwareGl ? 0.0 : 0.24;
+        composer.agxPass.uniforms.uSsaoStrength.value = softwareGl || isMobile ? 0.0 : 0.24;
       }
       updateWorldCohesionUniforms({
         hazeColor: 0x2c3c48,
@@ -227,6 +267,12 @@ export function createVillageWorld(canvas) {
         warmBounceColor: 0x3b2d22,
       });
     }
+
+    if (wasMissing && !softwareGl) {
+      renderer.compile(scene, camera);
+    }
+    shadowRig.refreshAllShadows?.();
+    renderer.shadowMap.needsUpdate = true;
   }
 
   applyThemeLighting(state.theme);
@@ -237,6 +283,8 @@ export function createVillageWorld(canvas) {
   if (!softwareGl) {
     renderer.compile(scene, camera);
   }
+  shadowRig.refreshAllShadows?.();
+  renderer.shadowMap.needsUpdate = true;
 
   const handleResize = () => {
     const w = canvas.clientWidth || 1376;
@@ -256,6 +304,7 @@ export function createVillageWorld(canvas) {
   });
   canvas.addEventListener("webglcontextrestored", () => {
     contextLost = false;
+    renderer.shadowMap.needsUpdate = true;
   });
 
   return {
@@ -268,23 +317,21 @@ export function createVillageWorld(canvas) {
       isStaticLockedCamera: true,
       theme: state.theme,
       aspect: IMG_ASPECT,
+      isMobile,
       isSoftwareWebGL: isSoftwareWebGL(renderer),
     }),
     update(dt, simTimeSec, realTimeSec) {
       if (contextLost) return;
       updateWorldCohesionUniforms({ time: realTimeSec });
 
-      if (state.theme === "light") {
-        dayTerrain.update(simTimeSec);
-        dayMountains.update(simTimeSec);
-        dayArch.update(dt, simTimeSec);
-        dayFoliage.update(simTimeSec);
-      } else {
-        nightTerrain.update(simTimeSec);
-        nightMountains.update(simTimeSec);
-        nightArch.update(dt, simTimeSec);
-        nightFoliage.update(simTimeSec);
-        nightFireflies.update(simTimeSec);
+      const activeKey = state.theme === "light" ? "light" : "dark";
+      const activeMode = modeCache[activeKey];
+      if (activeMode) {
+        activeMode.terrain.update(simTimeSec);
+        activeMode.mountains.update(simTimeSec);
+        activeMode.arch.update(dt, simTimeSec);
+        activeMode.foliage.update(simTimeSec);
+        if (activeMode.fireflies) activeMode.fireflies.update(simTimeSec);
       }
       composer.render(realTimeSec);
     },
@@ -295,14 +342,15 @@ export function createVillageWorld(canvas) {
     dispose() {
       unsubTheme();
       window.removeEventListener("resize", handleResize);
-      nightTerrain.dispose();
-      nightMountains.dispose();
-      nightArch.dispose();
-      nightFoliage.dispose();
-      dayTerrain.dispose();
-      dayMountains.dispose();
-      dayArch.dispose();
-      dayFoliage.dispose();
+      for (const key of ["dark", "light"]) {
+        const m = modeCache[key];
+        if (!m) continue;
+        m.terrain.dispose();
+        m.mountains.dispose();
+        m.arch.dispose();
+        m.foliage.dispose();
+        if (m.fireflies) m.fireflies.dispose();
+      }
       envTex.dispose();
       renderer.dispose();
     },

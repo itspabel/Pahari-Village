@@ -671,34 +671,57 @@ export function getMountainDetailNormalMap() {
   return normalMap;
 }
 
-/** Layered soft volumetric cloud texture (sunlit morning clouds & moonlit night veils) */
+/** Layered soft volumetric cloud texture (sunlit morning cumulus clouds & moonlit night veils) */
 export function getCloudWispsTexture(isDay = true) {
-  const key = `cloud_wisp_hi_${isDay ? "d" : "n"}`;
+  const key = `cloud_wisp_vol_${isDay ? "d" : "n"}`;
   if (_cache.has(key)) return _cache.get(key);
 
   const W = 512, H = 256;
   const { canvas, ctx } = makeCanvas(W, H);
   ctx.clearRect(0, 0, W, H);
 
+  if (isDay) {
+    // Cool silver-blue lower cloud belly first so sunlit tops layer cleanly above
+    const basePuffs = [
+      [148, 162, 102, 42, 0.68],
+      [256, 166, 138, 46, 0.75],
+      [366, 160, 98, 40, 0.66],
+    ];
+    for (const [cx, cy, rx, ry, alpha] of basePuffs) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(1, ry / rx);
+      const g = ctx.createRadialGradient(0, rx * 0.15, rx * 0.08, 0, 0, rx);
+      g.addColorStop(0, `rgba(176, 198, 222, ${alpha})`);
+      g.addColorStop(0.62, `rgba(192, 212, 232, ${alpha * 0.58})`);
+      g.addColorStop(1, "rgba(210, 224, 240, 0.0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, rx, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   const puffs = [
-    [130, 146, 98, 52, 0.50],
-    [225, 118, 118, 66, 0.62],
-    [325, 128, 108, 58, 0.58],
-    [400, 152, 84, 44, 0.44],
-    [262, 92, 88, 54, 0.68],
-    [182, 104, 82, 48, 0.58],
-    [300, 156, 140, 40, 0.36],
+    [130, 142, 96, 52, isDay ? 0.78 : 0.50],
+    [225, 114, 118, 68, isDay ? 0.88 : 0.62],
+    [325, 124, 108, 58, isDay ? 0.84 : 0.58],
+    [400, 148, 84, 44, isDay ? 0.72 : 0.44],
+    [262, 86, 90, 56, isDay ? 0.94 : 0.68],
+    [182, 100, 82, 48, isDay ? 0.86 : 0.58],
+    [310, 104, 78, 46, isDay ? 0.84 : 0.48],
   ];
 
   for (const [cx, cy, rx, ry, alpha] of puffs) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.scale(1, ry / rx);
-    const g = ctx.createRadialGradient(0, -rx * 0.14, rx * 0.08, 0, 0, rx);
+    const g = ctx.createRadialGradient(0, -rx * 0.18, rx * 0.08, 0, 0, rx);
     if (isDay) {
-      g.addColorStop(0, `rgba(255, 252, 244, ${alpha})`);
-      g.addColorStop(0.55, `rgba(246, 240, 228, ${alpha * 0.62})`);
-      g.addColorStop(1, "rgba(232, 232, 234, 0.0)");
+      g.addColorStop(0, `rgba(255, 254, 250, ${alpha})`);
+      g.addColorStop(0.56, `rgba(248, 246, 240, ${alpha * 0.72})`);
+      g.addColorStop(1, "rgba(232, 238, 246, 0.0)");
     } else {
       g.addColorStop(0, `rgba(184, 200, 214, ${alpha * 0.72})`);
       g.addColorStop(0.55, `rgba(128, 146, 166, ${alpha * 0.42})`);
@@ -773,4 +796,126 @@ export function getButterflyWingTexture(paletteIdx = 0) {
 
   return makeTex(canvas, { key, srgb: true, wrap: THREE.ClampToEdgeWrapping });
 }
+
+/** Realistic feathered right bird wing texture with scalloped secondaries & slotted primary tips */
+export function getBirdWingTexture(isDay = true) {
+  const key = `bird_wing_plumage_${isDay ? "d" : "n"}`;
+  if (_cache.has(key)) return _cache.get(key);
+
+  const W = 256, H = 128;
+  const { canvas, ctx } = makeCanvas(W, H);
+  ctx.clearRect(0, 0, W, H);
+
+  // Leading-edge wing membrane + covert base (root at x=0, tip at x=252)
+  ctx.beginPath();
+  ctx.moveTo(0, 14);
+  ctx.bezierCurveTo(68, 8, 152, 16, 246, 40);
+  ctx.bezierCurveTo(212, 68, 154, 96, 98, 108);
+  ctx.bezierCurveTo(56, 114, 18, 104, 0, 96);
+  ctx.closePath();
+
+  const baseGrad = ctx.createLinearGradient(0, 18, 248, 82);
+  if (isDay) {
+    baseGrad.addColorStop(0.0, "#faf6ec");
+    baseGrad.addColorStop(0.42, "#ebe5d7");
+    baseGrad.addColorStop(0.68, "#5d6870");
+    baseGrad.addColorStop(1.0, "#1c242b");
+  } else {
+    baseGrad.addColorStop(0.0, "#3d4d5a");
+    baseGrad.addColorStop(0.55, "#222d36");
+    baseGrad.addColorStop(1.0, "#0f151b");
+  }
+  ctx.fillStyle = baseGrad;
+  ctx.fill();
+
+  // Overlapping secondary covert feathers (inner wing x=6..140)
+  for (let i = 0; i < 9; i++) {
+    const fx = 10 + i * 14.5;
+    const fy = 56 + Math.sin(i * 0.4) * 6;
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(0.08 + i * 0.02);
+    ctx.beginPath();
+    ctx.ellipse(0, 20, 11, 34, 0, 0, Math.PI * 2);
+    ctx.fillStyle = isDay
+      ? i % 2 === 0
+        ? "rgba(246, 241, 230, 0.92)"
+        : "rgba(226, 220, 206, 0.90)"
+      : "rgba(42, 54, 64, 0.92)";
+    ctx.fill();
+    ctx.strokeStyle = isDay ? "rgba(120, 128, 134, 0.35)" : "rgba(18, 24, 30, 0.45)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Slotted outer primary flight feathers fanning gracefully at wingtip (x=136..250)
+  for (let p = 0; p < 6; p++) {
+    const t = p / 5;
+    const px = 140 + p * 18;
+    const py = 46 - p * 2.5;
+    const len = 62 - p * 4;
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(-0.48 - t * 0.42);
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.quadraticCurveTo(len * 0.65, -7, len, 0);
+    ctx.quadraticCurveTo(len * 0.65, 7, 0, 7);
+    ctx.closePath();
+    ctx.fillStyle = isDay ? (p < 2 ? "#3b464f" : "#1c242b") : "#121a21";
+    ctx.fill();
+    ctx.strokeStyle = isDay ? "rgba(225, 232, 238, 0.28)" : "rgba(110, 132, 152, 0.25)";
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Subtle sunlit leading-edge feather trim
+  ctx.beginPath();
+  ctx.moveTo(2, 16);
+  ctx.bezierCurveTo(68, 10, 150, 18, 240, 41);
+  ctx.strokeStyle = isDay ? "rgba(255, 252, 244, 0.85)" : "rgba(130, 156, 178, 0.45)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  return makeTex(canvas, { key, srgb: true, wrap: THREE.ClampToEdgeWrapping });
+}
+
+/** Fanned feathered tail texture for articulated 3D birds */
+export function getBirdTailTexture(isDay = true) {
+  const key = `bird_tail_plumage_${isDay ? "d" : "n"}`;
+  if (_cache.has(key)) return _cache.get(key);
+
+  const S = 128;
+  const { canvas, ctx } = makeCanvas(S, S);
+  ctx.clearRect(0, 0, S, S);
+
+  // Tail base at top center (64, 8), fanning downward to y=118
+  for (let i = -3; i <= 3; i++) {
+    ctx.save();
+    ctx.translate(64, 12);
+    ctx.rotate(i * 0.14);
+    ctx.beginPath();
+    ctx.moveTo(-8, 0);
+    ctx.quadraticCurveTo(-10, 68, 0, 102 - Math.abs(i) * 4);
+    ctx.quadraticCurveTo(10, 68, 8, 0);
+    ctx.closePath();
+    ctx.fillStyle = isDay
+      ? Math.abs(i) === 3
+        ? "#2a333c"
+        : i % 2 === 0
+        ? "#e7e1d4"
+        : "#cfc9bc"
+      : "#1a232b";
+    ctx.fill();
+    ctx.strokeStyle = isDay ? "rgba(60,70,80,0.28)" : "rgba(8,12,16,0.45)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  return makeTex(canvas, { key, srgb: true, wrap: THREE.ClampToEdgeWrapping });
+}
+
 

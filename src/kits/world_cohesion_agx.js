@@ -522,7 +522,7 @@ const FusedAgXPostShader = {
         }
       }
 
-      // 2. Screen-Space Depth Contact AO (6-tap spiral micro-crevice grounding)
+      // 2. Screen-Space Depth Contact AO (4-tap spiral micro-crevice grounding)
       if (uSsaoStrength > 0.001 && centerDepth < uCameraFar * 0.92) {
         float resScale = clamp(uResolution.y / 1080.0, 0.65, 2.2);
         float occ = 0.0;
@@ -530,9 +530,9 @@ const FusedAgXPostShader = {
         // Scale range threshold linearly with depth so grazing tabletop planes never self-occlude
         float biasD = 0.022 + centerDepth * 0.0022;
         float maxRangeD = 0.45 + centerDepth * 0.032;
-        for (int k = 0; k < 6; k++) {
+        for (int k = 0; k < 4; k++) {
           float fk = float(k);
-          float radPx = (2.6 + fk * 1.15) * resScale;
+          float radPx = (2.8 + fk * 1.45) * resScale;
           float ang = fk * 2.39996323 + aoSeed;
           vec2 aoUv = vUv + vec2(cos(ang), sin(ang)) * radPx * texel;
           float dSample = readLinearDepth(aoUv);
@@ -542,7 +542,7 @@ const FusedAgXPostShader = {
             occ += rangeFalloff;
           }
         }
-        float rawAo = clamp((occ / 6.0) * uSsaoStrength * 2.1, 0.0, 0.44);
+        float rawAo = clamp((occ / 4.0) * uSsaoStrength * 2.1, 0.0, 0.44);
         // Protect bright emissive window sky & specular clearcoat highlights from AO darkening
         float pixelLuma = dot(hdrColor, vec3(0.2126, 0.7152, 0.0722));
         float highlightProtect = 1.0 - smoothstep(0.95, 2.1, pixelLuma);
@@ -584,13 +584,14 @@ const FusedAgXPostShader = {
 
 export function createFusedAgXComposer(renderer, scene, camera, opts = {}) {
   const softwareCpu = isSoftwareWebGL(renderer);
+  const bypassComposer = Boolean(opts.bypassComposer) || (softwareCpu && !opts.forceComposerOnSoftware);
   const tel = ensureTelemetry();
-  tel.agxPostFxActive = true;
+  tel.agxPostFxActive = !bypassComposer;
   tel.isSoftwareRasterizer = softwareCpu;
 
-  // Backward-compatible optional CPU bypass when forceComposerOnSoftware is not requested
-  if (softwareCpu && !opts.forceComposerOnSoftware) {
-    if (typeof window !== "undefined") {
+  // Lightweight direct-render path for software WebGL or mobile TBDR GPUs
+  if (bypassComposer) {
+    if (typeof window !== "undefined" && !opts.preservePixelRatio) {
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     }
     renderer.toneMapping = THREE.AgXToneMapping ?? THREE.ACESFilmicToneMapping;
@@ -625,7 +626,9 @@ export function createFusedAgXComposer(renderer, scene, camera, opts = {}) {
   const initW = Math.max(2, Math.round(drawSize.x));
   const initH = Math.max(2, Math.round(drawSize.y));
 
+  const disableDepthEffects = Boolean(opts.disableDepthEffects);
   const createDepthTex = (w, h) => {
+    if (disableDepthEffects) return null;
     const dt = new THREE.DepthTexture(w, h, THREE.UnsignedIntType);
     dt.format = THREE.DepthFormat;
     dt.minFilter = THREE.NearestFilter;
@@ -634,23 +637,27 @@ export function createFusedAgXComposer(renderer, scene, camera, opts = {}) {
     return dt;
   };
 
-  const hdrTarget = new THREE.WebGLRenderTarget(initW, initH, {
+  const hdrOpts = {
     type: THREE.HalfFloatType,
     colorSpace: THREE.LinearSRGBColorSpace,
     minFilter: THREE.LinearFilter,
     magFilter: THREE.LinearFilter,
     depthBuffer: true,
     stencilBuffer: false,
-    depthTexture: createDepthTex(initW, initH),
-  });
+  };
+  if (!disableDepthEffects) {
+    hdrOpts.depthTexture = createDepthTex(initW, initH);
+  }
+  const hdrTarget = new THREE.WebGLRenderTarget(initW, initH, hdrOpts);
 
   const composer = new EffectComposer(renderer, hdrTarget);
-  // Ensure cloned readBuffer also carries a clean NearestFilter DepthTexture
-  if (!composer.readBuffer.depthTexture) {
-    composer.readBuffer.depthTexture = createDepthTex(initW, initH);
-  } else {
-    composer.readBuffer.depthTexture.minFilter = THREE.NearestFilter;
-    composer.readBuffer.depthTexture.magFilter = THREE.NearestFilter;
+  if (!disableDepthEffects) {
+    if (!composer.readBuffer.depthTexture) {
+      composer.readBuffer.depthTexture = createDepthTex(initW, initH);
+    } else {
+      composer.readBuffer.depthTexture.minFilter = THREE.NearestFilter;
+      composer.readBuffer.depthTexture.magFilter = THREE.NearestFilter;
+    }
   }
 
   const renderPass = new RenderPass(scene, camera);
@@ -729,8 +736,8 @@ export function createFusedAgXComposer(renderer, scene, camera, opts = {}) {
       renderPass.render(renderer, composer.writeBuffer, composer.readBuffer, 0, false);
       recordRendererTelemetry(renderer);
 
-      // 2. Render single-pass Fused AgX + Depth Contact AO + Optical Bokeh DoF to screen
-      agxPass.uniforms.tDepth.value = composer.readBuffer.depthTexture;
+      // 2. Render single-pass Fused AgX + Bloom + Vignette (and optional Depth AO/DoF) to screen
+      agxPass.uniforms.tDepth.value = disableDepthEffects ? null : composer.readBuffer.depthTexture;
       agxPass.renderToScreen = true;
       agxPass.render(renderer, composer.writeBuffer, composer.readBuffer, 0, false);
       renderer.setRenderTarget(null);

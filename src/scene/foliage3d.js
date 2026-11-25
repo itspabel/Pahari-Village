@@ -13,6 +13,7 @@ import {
   NIGHT_STREAM_UVS,
   DAY_ROAD_UVS,
   DAY_LEFT_TRAIL_UVS,
+  DAY_STREAM_UVS,
 } from "./terrain3d.js";
 import {
   getBarkMaps,
@@ -110,6 +111,7 @@ function buildOrganicBroadleafTree({
   leafMats,
   domeGeo,
   seed = 0,
+  castLeafShadow = true,
 }) {
   const tree = new THREE.Group();
   tree.position.copy(pos);
@@ -160,7 +162,7 @@ function buildOrganicBroadleafTree({
         bz + Math.sin(ang + k * 1.4) * spread * 0.10
       );
       dome.rotation.set(Math.sin(ang) * 0.34, ang + k * 1.1, -Math.cos(ang) * 0.34);
-      dome.castShadow = true;
+      dome.castShadow = castLeafShadow;
       dome.receiveShadow = true;
       tree.add(dome);
     }
@@ -172,7 +174,7 @@ function buildOrganicBroadleafTree({
     crownDome.scale.set(sc, sc * 1.08, sc);
     crownDome.position.set(leanX, height * (0.85 + c * 0.07), leanZ);
     crownDome.rotation.set(0.18 * (c - 1), c * 1.2 + seed, 0.14 * (1 - c));
-    crownDome.castShadow = true;
+    crownDome.castShadow = castLeafShadow;
     crownDome.receiveShadow = true;
     tree.add(crownDome);
   }
@@ -181,7 +183,7 @@ function buildOrganicBroadleafTree({
 }
 
 /** Arching bamboo culm cluster with feathered lance-leaf sprays */
-function buildBambooClump({ pos, height = 6.8, culms = 9, culmMat, sprayMat, seed = 0 }) {
+function buildBambooClump({ pos, height = 6.8, culms = 9, culmMat, sprayMat, seed = 0, castLeafShadow = true }) {
   const clump = new THREE.Group();
   clump.position.copy(pos);
 
@@ -214,7 +216,7 @@ function buildBambooClump({ pos, height = 6.8, culms = 9, culmMat, sprayMat, see
       const sp = new THREE.Mesh(sprayGeo, sprayMat);
       sp.position.set(px, py, pz);
       sp.rotation.set(0.45 + s * 0.12, ang + s * 0.9, (s % 2 === 0 ? 1 : -1) * 0.28);
-      sp.castShadow = true;
+      sp.castShadow = castLeafShadow;
       clump.add(sp);
     }
   }
@@ -223,7 +225,7 @@ function buildBambooClump({ pos, height = 6.8, culms = 9, culmMat, sprayMat, see
 }
 
 /** Graceful leaning curved coconut palm with arched pinnate frond crown */
-function buildCoconutPalm({ pos, height = 6.2, lean = 1.1, barkMat, frondMat, seed = 0 }) {
+function buildCoconutPalm({ pos, height = 6.2, lean = 1.1, barkMat, frondMat, seed = 0, castLeafShadow = true }) {
   const palm = new THREE.Group();
   palm.position.copy(pos);
 
@@ -265,7 +267,7 @@ function buildCoconutPalm({ pos, height = 6.2, lean = 1.1, barkMat, frondMat, se
     holder.rotation.y = yaw;
     const frond = new THREE.Mesh(frondGeo, frondMat);
     frond.rotation.x = 0.26 + (f % 3) * 0.19;
-    frond.castShadow = true;
+    frond.castShadow = castLeafShadow;
     holder.add(frond);
     crown.add(holder);
   }
@@ -274,7 +276,7 @@ function buildCoconutPalm({ pos, height = 6.2, lean = 1.1, barkMat, frondMat, se
 }
 
 /** Lush tropical banana plant cluster with V-creased 3D arched paddle leaves */
-function buildBananaCluster({ pos, scale = 1.0, leafMat, stemMat, seed = 0 }) {
+function buildBananaCluster({ pos, scale = 1.0, leafMat, stemMat, seed = 0, castLeafShadow = true }) {
   const banana = new THREE.Group();
   banana.position.copy(pos);
 
@@ -303,7 +305,7 @@ function buildBananaCluster({ pos, scale = 1.0, leafMat, stemMat, seed = 0 }) {
     ];
     const stemGeo = createTaperedSplineTube(stemPts, 6, 0.115 * scale, 0.068 * scale, 6);
     const stem = new THREE.Mesh(stemGeo, stemMat);
-    stem.castShadow = true;
+    stem.castShadow = castLeafShadow;
     banana.add(stem);
 
     const leaves = 8;
@@ -314,7 +316,7 @@ function buildBananaCluster({ pos, scale = 1.0, leafMat, stemMat, seed = 0 }) {
       holder.rotation.y = ang;
       const blade = new THREE.Mesh(bladeGeo, leafMat);
       blade.rotation.x = 0.38 + (l % 3) * 0.20;
-      blade.castShadow = true;
+      blade.castShadow = castLeafShadow;
       holder.add(blade);
       banana.add(holder);
     }
@@ -324,7 +326,7 @@ function buildBananaCluster({ pos, scale = 1.0, leafMat, stemMat, seed = 0 }) {
 }
 
 /** Volumetric 3D shrub mound */
-function buildShrubCluster({ pos, scale = 1.0, leafMats, domeGeo, seed = 0 }) {
+function buildShrubCluster({ pos, scale = 1.0, leafMats, domeGeo, seed = 0, castLeafShadow = true }) {
   const shrub = new THREE.Group();
   shrub.position.copy(pos);
 
@@ -335,7 +337,7 @@ function buildShrubCluster({ pos, scale = 1.0, leafMats, domeGeo, seed = 0 }) {
     dome.scale.set(sc, sc * 1.15, sc);
     dome.position.set(Math.cos(ang) * 0.24 * scale, 0.12 * scale + (i === 3 ? 0.18 * scale : 0), Math.sin(ang) * 0.24 * scale);
     dome.rotation.set(0.22, ang, (i % 2 === 0 ? 1 : -1) * 0.15);
-    dome.castShadow = true;
+    dome.castShadow = castLeafShadow;
     dome.receiveShadow = true;
     shrub.add(dome);
   }
@@ -346,18 +348,20 @@ function buildShrubCluster({ pos, scale = 1.0, leafMats, domeGeo, seed = 0 }) {
  * Instanced Dense Tropical Hillside Canopy & Shrubbery Layer (400+ lush 3D foliage crowns)
  * Automatically avoids roads, streams, rice terraces, vegetable beds, and Machang hut footprints.
  */
-function populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group }) {
-  const roadCurves = (isDay ? [DAY_ROAD_UVS, DAY_LEFT_TRAIL_UVS] : [NIGHT_ROAD_UVS, NIGHT_VALLEY_ROAD_UVS, NIGHT_STREAM_UVS]).map(
-    (uvs) => uvs.map(([u, v]) => solveTerrainAtUV(u, v, mode, 0))
-  );
+function populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group, isMobile = false }) {
+  const roadCurves = (
+    isDay
+      ? [DAY_ROAD_UVS, DAY_LEFT_TRAIL_UVS, DAY_STREAM_UVS]
+      : [NIGHT_ROAD_UVS, NIGHT_VALLEY_ROAD_UVS, NIGHT_STREAM_UVS]
+  ).map((uvs) => uvs.map(([u, v]) => solveTerrainAtUV(u, v, mode, 0)));
 
-  // Hut exclusion centers (in UV) so trees/bushes frame huts closely without clipping inside rooms
+  // Hut & waterfall cliff exclusion centers (in UV) so trees/bushes frame huts & cascade without clipping
   const hutUVs = isDay
     ? [
         [0.932, 0.752], [0.842, 0.774], [0.594, 0.852], [0.556, 0.664],
         [0.390, 0.785], [0.460, 0.706], [0.592, 0.576], [0.720, 0.555],
         [0.674, 0.506], [0.758, 0.480], [0.818, 0.438], [0.892, 0.458],
-        [0.960, 0.408], [0.79, 0.625], [0.852, 0.910],
+        [0.960, 0.408], [0.79, 0.625], [0.852, 0.910], [0.352, 0.455],
       ]
     : [
         [0.138, 0.748], [0.872, 0.658], [0.770, 0.512], [0.850, 0.468],
@@ -393,15 +397,15 @@ function populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group }) 
   const zones = isDay
     ? [
         // Left valley jungle & distant sunlit foothills
-        { u0: 0.01, u1: 0.36, v0: 0.52, v1: 0.96, count: 165, scMin: 1.0, scMax: 2.3 },
-        // Mid-left valley behind bamboo & huts
-        { u0: 0.36, u1: 0.58, v0: 0.48, v1: 0.72, count: 75, scMin: 0.9, scMax: 1.9 },
+        { u0: 0.01, u1: 0.34, v0: 0.43, v1: 0.96, count: 210, scMin: 1.05, scMax: 2.45 },
+        // Mid-left valley foothills & ridge behind bamboo & huts
+        { u0: 0.36, u1: 0.60, v0: 0.43, v1: 0.72, count: 110, scMin: 0.95, scMax: 2.15 },
         // Foreground bottom lush verges
-        { u0: 0.02, u1: 0.66, v0: 0.84, v1: 0.99, count: 75, scMin: 0.75, scMax: 1.45 },
+        { u0: 0.02, u1: 0.66, v0: 0.84, v1: 0.99, count: 80, scMin: 0.75, scMax: 1.45 },
         // Right upper jungle ridge & hillside between huts
-        { u0: 0.64, u1: 0.99, v0: 0.35, v1: 0.66, count: 105, scMin: 0.95, scMax: 2.15 },
+        { u0: 0.60, u1: 0.99, v0: 0.34, v1: 0.66, count: 135, scMin: 1.0, scMax: 2.25 },
         // Right foreground edge bushes
-        { u0: 0.88, u1: 0.99, v0: 0.62, v1: 0.98, count: 38, scMin: 0.85, scMax: 1.6 },
+        { u0: 0.88, u1: 0.99, v0: 0.62, v1: 0.98, count: 42, scMin: 0.85, scMax: 1.65 },
       ]
     : [
         // Left dense jungle behind Machang & valley slope
@@ -421,7 +425,7 @@ function populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group }) 
       const u = THREE.MathUtils.lerp(z.u0, z.u1, seeded(idxCounter, 1));
       const v = THREE.MathUtils.lerp(z.v0, z.v1, seeded(idxCounter, 2));
       const p = solveTerrainAtUV(u, v, mode, 0);
-      if (p.z < -68 || p.z > 14) continue;
+      if (p.z < -82 || p.z > 14) continue;
       if (!isClearXZ(p.x, p.z, v > 0.78 ? 1.85 : 1.55, 2.75)) continue;
 
       const sc = THREE.MathUtils.lerp(z.scMin, z.scMax, seeded(idxCounter, 3));
@@ -441,15 +445,17 @@ function populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group }) 
     if (!mats.length) return;
     const inst = new THREE.InstancedMesh(domeGeo, leafMats[bIdx], mats.length);
     mats.forEach((m, i) => inst.setMatrixAt(i, m));
-    inst.castShadow = true;
+    inst.castShadow = !isMobile;
     inst.receiveShadow = true;
     inst.instanceMatrix.needsUpdate = true;
     group.add(inst);
   });
 }
 
-export function createFoliageForMode(mode = "dark") {
+export function createFoliageForMode(mode = "dark", opts = {}) {
   const isDay = mode === "light";
+  const isMobile = Boolean(opts.isMobile);
+  const castLeafShadow = true;
   const group = new THREE.Group();
   const windMats = [];
 
@@ -522,7 +528,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.265, 0.62, 6.4, 8, 3.8],
       [0.642, 0.41, 4.9, 7, 4.2],
     ]) {
-      group.add(buildBambooClump({ pos: solveTerrainAtUV(u, v, "dark"), height: h, culms: c, culmMat: bambooMat, sprayMat: bambooSprayMat, seed: s }));
+      group.add(buildBambooClump({ pos: solveTerrainAtUV(u, v, "dark"), height: h, culms: c, culmMat: bambooMat, sprayMat: bambooSprayMat, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, h, l, s] of [
@@ -530,7 +536,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.955, 0.34, 6.0, -1.1, 2.5],
       [0.540, 0.52, 4.6, 0.7, 3.9],
     ]) {
-      group.add(buildCoconutPalm({ pos: solveTerrainAtUV(u, v, "dark"), height: h, lean: l, barkMat, frondMat: palmFrondMat, seed: s }));
+      group.add(buildCoconutPalm({ pos: solveTerrainAtUV(u, v, "dark"), height: h, lean: l, barkMat, frondMat: palmFrondMat, seed: s, castLeafShadow }));
     }
 
     // Hero broadleaf jungle trees across left bluff, mid ridge, and entire right hillside
@@ -549,7 +555,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.73, 0.62, 4.2, 2.2, 7.8],
       [0.61, 0.71, 3.8, 2.1, 8.4],
     ]) {
-      group.add(buildOrganicBroadleafTree({ pos: solveTerrainAtUV(u, v, "dark"), height: h, spread: sp, barkMat, leafMats, domeGeo, seed: s }));
+      group.add(buildOrganicBroadleafTree({ pos: solveTerrainAtUV(u, v, "dark"), height: h, spread: sp, barkMat, leafMats, domeGeo, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, sc, s] of [
@@ -562,7 +568,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.935, 0.86, 1.32, 3.4],
       [0.890, 0.92, 1.25, 6.1],
     ]) {
-      group.add(buildBananaCluster({ pos: solveTerrainAtUV(u, v, "dark"), scale: sc, leafMat: bananaLeafMat, stemMat: bananaStemMat, seed: s }));
+      group.add(buildBananaCluster({ pos: solveTerrainAtUV(u, v, "dark"), scale: sc, leafMat: bananaLeafMat, stemMat: bananaStemMat, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, sc, s] of [
@@ -576,7 +582,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.54, 0.75, 1.05, 8],
       [0.76, 0.62, 0.95, 9],
     ]) {
-      group.add(buildShrubCluster({ pos: solveTerrainAtUV(u, v, "dark"), scale: sc, leafMats, domeGeo, seed: s }));
+      group.add(buildShrubCluster({ pos: solveTerrainAtUV(u, v, "dark"), scale: sc, leafMats, domeGeo, seed: s, castLeafShadow }));
     }
   } else {
     // DAY FOLIAGE — Dense FG Left Banana & Palm Jungle, Mid Bamboo & Rich Right Hillside Forest
@@ -591,7 +597,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.95, 0.48, 0.88, 7.2],
       [0.85, 0.39, 0.86, 8.1],
     ]) {
-      group.add(buildBananaCluster({ pos: solveTerrainAtUV(u, v, "light"), scale: sc, leafMat: bananaLeafMat, stemMat: bananaStemMat, seed: s }));
+      group.add(buildBananaCluster({ pos: solveTerrainAtUV(u, v, "light"), scale: sc, leafMat: bananaLeafMat, stemMat: bananaStemMat, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, h, c, s] of [
@@ -599,7 +605,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.47, 0.59, 6.0, 8, 2.5],
       [0.51, 0.58, 5.4, 7, 3.1],
     ]) {
-      group.add(buildBambooClump({ pos: solveTerrainAtUV(u, v, "light"), height: h, culms: c, culmMat: bambooMat, sprayMat: bambooSprayMat, seed: s }));
+      group.add(buildBambooClump({ pos: solveTerrainAtUV(u, v, "light"), height: h, culms: c, culmMat: bambooMat, sprayMat: bambooSprayMat, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, h, l, s] of [
@@ -609,15 +615,19 @@ export function createFoliageForMode(mode = "dark") {
       [0.82, 0.35, 5.8, 0.8, 3.9],
       [0.89, 0.33, 6.2, -0.9, 5.1],
     ]) {
-      group.add(buildCoconutPalm({ pos: solveTerrainAtUV(u, v, "light"), height: h, lean: l, barkMat, frondMat: palmFrondMat, seed: s }));
+      group.add(buildCoconutPalm({ pos: solveTerrainAtUV(u, v, "light"), height: h, lean: l, barkMat, frondMat: palmFrondMat, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, h, sp, s] of [
       [0.04, 0.74, 5.9, 3.1, 1.0],
       [0.12, 0.68, 4.9, 2.6, 1.5],
+      [0.20, 0.56, 5.2, 2.6, 1.6],
+      [0.27, 0.54, 4.9, 2.5, 2.0],
       [0.25, 0.76, 4.6, 2.4, 1.8],
       [0.29, 0.88, 4.6, 2.5, 2.1],
-      [0.35, 0.69, 4.8, 2.4, 3.2],
+      [0.39, 0.63, 4.9, 2.4, 3.2],
+      [0.44, 0.52, 4.8, 2.4, 3.4],
+      [0.54, 0.49, 4.9, 2.5, 3.6],
       [0.64, 0.45, 4.6, 2.3, 3.8],
       [0.70, 0.42, 5.4, 2.7, 4.3],
       [0.79, 0.39, 5.0, 2.5, 5.4],
@@ -626,7 +636,7 @@ export function createFoliageForMode(mode = "dark") {
       [0.96, 0.46, 5.2, 2.7, 7.0],
       [0.86, 0.54, 4.3, 2.2, 7.6],
     ]) {
-      group.add(buildOrganicBroadleafTree({ pos: solveTerrainAtUV(u, v, "light"), height: h, spread: sp, barkMat, leafMats, domeGeo, seed: s }));
+      group.add(buildOrganicBroadleafTree({ pos: solveTerrainAtUV(u, v, "light"), height: h, spread: sp, barkMat, leafMats, domeGeo, seed: s, castLeafShadow }));
     }
 
     for (const [u, v, sc, s] of [
@@ -636,13 +646,19 @@ export function createFoliageForMode(mode = "dark") {
       [0.88, 0.66, 0.96, 4],
       [0.21, 0.78, 1.18, 5],
       [0.61, 0.72, 0.95, 6],
+      [0.31, 0.50, 1.10, 7],
+      [0.38, 0.51, 1.05, 8],
+      [0.28, 0.62, 1.12, 9],
+      [0.17, 0.51, 1.25, 10],
+      [0.49, 0.49, 1.15, 11],
+      [0.59, 0.46, 1.10, 12],
     ]) {
-      group.add(buildShrubCluster({ pos: solveTerrainAtUV(u, v, "light"), scale: sc, leafMats, domeGeo, seed: s }));
+      group.add(buildShrubCluster({ pos: solveTerrainAtUV(u, v, "light"), scale: sc, leafMats, domeGeo, seed: s, castLeafShadow }));
     }
   }
 
-  // Dense 400+ instanced 3D foliage crowns & shrubs blanketing valleys, ridges & verges
-  populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group });
+  // Dense instanced 3D foliage crowns & shrubs blanketing valleys, ridges & verges
+  populateDenseHillsideCanopy({ mode, isDay, domeGeo, leafMats, group, isMobile });
 
   // Animated 3D fluttering butterflies (Projapoti) over foreground flowers, shrubs & gardens
   const butterflies = buildButterfliesForMode(mode, isDay, group);
